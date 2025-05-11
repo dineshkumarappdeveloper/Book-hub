@@ -5,19 +5,22 @@ import { Navbar } from '@/components/navbar';
 import { SearchBar } from '@/components/search-bar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+// Label component is not directly used, FormLabel is used inside FormField
+// import { Label } from '@/components/ui/label';
 import { useCart } from '@/contexts/cart-context';
 import { CartItemCard } from '@/components/cart/cart-item-card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { ShoppingBag, ArrowLeft, CreditCard, Home, Mail, User, MapPin } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, CreditCard, Home, Mail, User, MapPin, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { deliveryInfoSchema, type DeliveryInfo } from '@/lib/schemas';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { createOrder } from './actions'; // Import the server action
+import type { OrderItem } from '@/lib/types';
 
 
 export default function CartPage() {
@@ -26,6 +29,7 @@ export default function CartPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState(''); 
   const [mounted, setMounted] = useState(false);
+  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
   const formMethods = useForm<DeliveryInfo>({
     resolver: zodResolver(deliveryInfoSchema),
@@ -45,18 +49,44 @@ export default function CartPage() {
     setMounted(true);
   }, []);
   
-  const handleCheckout = (data: DeliveryInfo) => {
-    if (!mounted) return;
+  const handleCheckout = async (data: DeliveryInfo) => {
+    if (!mounted || cartItems.length === 0) return;
+    setIsProcessingCheckout(true);
 
-    console.log('Delivery Information:', data);
-    
-    toast({
-      title: 'Order Placed Successfully!',
-      description: `Your order with Cash on Delivery has been placed. It will be delivered to ${data.addressLine1}, ${data.city}. You will receive a confirmation email at ${data.email}.`,
-      duration: 7000,
-    });
-    clearCart();
-    router.push('/'); 
+    const orderItems: OrderItem[] = cartItems.map(item => ({
+        bookId: item.id,
+        title: item.title,
+        quantity: item.quantity,
+        price: item.price,
+        coverImage: item.coverImage,
+    }));
+
+    try {
+      const { orderId } = await createOrder({
+        deliveryInfo: data,
+        items: orderItems,
+        totalAmount: getCartTotal(),
+        // userId: can be added if user authentication is implemented
+      });
+      
+      toast({
+        title: 'Order Placed Successfully!',
+        description: `Your order #${orderId} with Cash on Delivery has been placed. It will be delivered to ${data.addressLine1}, ${data.city}. You will receive a confirmation email at ${data.email}.`,
+        duration: 7000,
+      });
+      clearCart();
+      router.push('/'); 
+    } catch (error) {
+        console.error('Checkout error:', error);
+        toast({
+            title: 'Checkout Failed',
+            description: (error as Error).message || 'An unexpected error occurred. Please try again.',
+            variant: 'destructive',
+            duration: 5000,
+        });
+    } finally {
+        setIsProcessingCheckout(false);
+    }
   };
 
   if (!mounted) {
@@ -278,9 +308,14 @@ export default function CartPage() {
                       type="submit"
                       className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
                       size="lg"
-                      disabled={formMethods.formState.isSubmitting || !mounted || cartItems.length === 0}
+                      disabled={isProcessingCheckout || !mounted || cartItems.length === 0}
                     >
-                      <CreditCard className="mr-2 h-5 w-5" /> {formMethods.formState.isSubmitting ? 'Processing...' : 'Checkout with Cash'}
+                      {isProcessingCheckout ? (
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      ) : (
+                        <CreditCard className="mr-2 h-5 w-5" />
+                      )}
+                      {isProcessingCheckout ? 'Processing...' : 'Checkout with Cash'}
                     </Button>
                     <p className="text-xs text-muted-foreground mt-2 text-center">You will pay upon delivery.</p>
                   </div>
@@ -296,4 +331,3 @@ export default function CartPage() {
     </div>
   );
 }
-
