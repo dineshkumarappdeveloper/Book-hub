@@ -5,33 +5,46 @@ import { AdminLoginForm } from '@/components/admin/admin-login-form';
 import { AdminDashboard } from '@/components/admin/admin-dashboard';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { BookOpenText, ArrowLeft } from 'lucide-react';
+import { BookOpenText, ArrowLeft, UserPlus } from 'lucide-react';
+
+const ADMIN_USERS_KEY = 'adminUsers';
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Check local storage for login state persistence (simple mock)
-    const loggedInStatus = localStorage.getItem('isAdminLoggedIn');
-    if (loggedInStatus === 'true') {
-      setIsLoggedIn(true);
-    }
     setMounted(true);
+    // Initialize admin users in localStorage if not present
+    if (typeof window !== 'undefined') {
+      const existingUsers = localStorage.getItem(ADMIN_USERS_KEY);
+      if (!existingUsers) {
+        localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify([{ username: 'admin', password: 'password' }]));
+      }
+      
+      const loggedInStatus = localStorage.getItem('isAdminLoggedIn');
+      if (loggedInStatus === 'true') {
+        setIsLoggedIn(true);
+      }
+    }
   }, []);
 
   const handleLoginSuccess = () => {
     setIsLoggedIn(true);
-    localStorage.setItem('isAdminLoggedIn', 'true'); // Persist login state
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('isAdminLoggedIn', 'true');
+    }
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
-    localStorage.removeItem('isAdminLoggedIn');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('isAdminLoggedIn');
+    }
   };
 
   if (!mounted) {
-    return <div className="flex items-center justify-center min-h-screen bg-background"><p>Loading admin...</p></div>; // Or a proper skeleton loader
+    return <div className="flex items-center justify-center min-h-screen bg-background"><p>Loading admin...</p></div>;
   }
 
   return (
@@ -57,7 +70,17 @@ export default function AdminPage() {
           </Button>
         </div>
       ) : (
-        <AdminLoginForm onLoginSuccess={handleLoginSuccess} />
+        <div className="w-full max-w-sm">
+          <AdminLoginForm onLoginSuccess={handleLoginSuccess} />
+          <div className="mt-6 text-center">
+            <Button variant="link" asChild className="text-sm text-primary hover:text-accent">
+              <Link href="/admin/signup">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Create a new Admin Account
+              </Link>
+            </Button>
+          </div>
+        </div>
       )}
       <footer className="absolute bottom-4 text-center text-sm text-muted-foreground">
          © {new Date().getFullYear()} BookBuy Hub.

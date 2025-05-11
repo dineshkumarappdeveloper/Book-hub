@@ -7,3 +7,7 @@ export interface Book {
   price: number;
   // Add other relevant fields like ISBN, publisher, publicationDate, genre etc. later if needed
 }
+
+export interface CartItem extends Book {
+  quantity: number;
+}

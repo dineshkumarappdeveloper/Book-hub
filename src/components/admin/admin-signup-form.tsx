@@ -6,48 +6,76 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { LogIn } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 
-interface AdminLoginFormProps {
-  onLoginSuccess: () => void;
+interface AdminSignupFormProps {
+  onSignupSuccess: () => void;
 }
 
 const ADMIN_USERS_KEY = 'adminUsers';
 
-export function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps) {
+export function AdminSignupForm({ onSignupSuccess }: AdminSignupFormProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-      setMounted(true);
+    setMounted(true);
+    if (typeof window !== 'undefined') {
+        const existingUsers = localStorage.getItem(ADMIN_USERS_KEY);
+        if (!existingUsers) {
+            localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify([{ username: 'admin', password: 'password' }]));
+        }
+    }
   }, []);
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mounted || typeof window === 'undefined') return;
+    if (!mounted) return;
 
-    const storedUsers = localStorage.getItem(ADMIN_USERS_KEY);
-    const adminUsers = storedUsers ? JSON.parse(storedUsers) : [];
-    
-    const foundUser = adminUsers.find(
-      (user: any) => user.username === username && user.password === password
-    );
-
-    if (foundUser) {
-      toast({ title: 'Login Successful', description: 'Welcome, Admin!', duration: 3000 });
-      onLoginSuccess();
-    } else {
+    if (password !== confirmPassword) {
       toast({
-        title: 'Login Failed',
-        description: 'Invalid username or password.',
+        title: 'Signup Failed',
+        description: 'Passwords do not match.',
         variant: 'destructive',
         duration: 3000,
       });
+      return;
     }
+
+    if (password.length < 6) {
+      toast({
+        title: 'Signup Failed',
+        description: 'Password must be at least 6 characters long.',
+        variant: 'destructive',
+        duration: 3000,
+      });
+      return;
+    }
+    
+    const storedUsers = localStorage.getItem(ADMIN_USERS_KEY);
+    const adminUsers = storedUsers ? JSON.parse(storedUsers) : [];
+
+    if (adminUsers.find((user: any) => user.username === username)) {
+      toast({
+        title: 'Signup Failed',
+        description: 'Username already exists.',
+        variant: 'destructive',
+        duration: 3000,
+      });
+      return;
+    }
+
+    adminUsers.push({ username, password });
+    localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(adminUsers));
+
+    toast({ title: 'Signup Successful', description: 'Admin account created. Please login.', duration: 3000 });
+    onSignupSuccess();
   };
-  
+
   if (!mounted) {
       return (
         <Card className="w-full max-w-sm mx-auto shadow-xl animate-pulse">
@@ -56,6 +84,10 @@ export function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps) {
                 <div className="h-4 bg-muted rounded w-1/2 mt-1"></div>
             </CardHeader>
             <CardContent className="space-y-4">
+                <div className="space-y-2">
+                    <div className="h-4 bg-muted rounded w-1/4"></div>
+                    <div className="h-10 bg-muted rounded w-full"></div>
+                </div>
                 <div className="space-y-2">
                     <div className="h-4 bg-muted rounded w-1/4"></div>
                     <div className="h-10 bg-muted rounded w-full"></div>
@@ -76,9 +108,9 @@ export function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps) {
     <Card className="w-full max-w-sm mx-auto shadow-xl">
       <CardHeader>
         <CardTitle className="text-2xl font-bold text-primary flex items-center">
-          <LogIn className="mr-2 h-6 w-6" /> Admin Login
+          <UserPlus className="mr-2 h-6 w-6" /> Admin Signup
         </CardTitle>
-        <CardDescription>Enter your credentials to access the admin panel.</CardDescription>
+        <CardDescription>Create a new administrator account.</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
@@ -87,7 +119,7 @@ export function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps) {
             <Input
               id="username"
               type="text"
-              placeholder="admin"
+              placeholder="Choose a username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
@@ -99,9 +131,21 @@ export function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps) {
             <Input
               id="password"
               type="password"
-              placeholder="password"
+              placeholder="Create a password (min. 6 chars)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              required
+              className="focus-visible:ring-accent"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Input
+              id="confirmPassword"
+              type="password"
+              placeholder="Confirm your password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               required
               className="focus-visible:ring-accent"
             />
@@ -109,7 +153,7 @@ export function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps) {
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-            Login
+            Create Account
           </Button>
         </CardFooter>
       </form>

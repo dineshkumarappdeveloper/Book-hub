@@ -1,23 +1,19 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import type { Book } from '@/lib/types';
 import { ShoppingCart } from 'lucide-react';
+import { useCart } from '@/contexts/cart-context';
 
 interface AddToCartButtonProps {
   book: Book;
 }
 
 export function AddToCartButton({ book }: AddToCartButtonProps) {
-  const { toast } = useToast();
+  const { addToCart } = useCart();
 
   const handleAddToCart = () => {
-    toast({
-      title: "Added to Cart (Mock)",
-      description: `${book.title} has been added to your cart.`,
-      duration: 3000,
-    });
+    addToCart(book);
   };
 
   return (

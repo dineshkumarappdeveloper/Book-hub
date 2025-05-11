@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 // import { GeistMono } from 'geist/font/mono'; // Removed as 'geist' package is not in dependencies
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { CartProvider } from '@/contexts/cart-context';
 
 // const geistSans = GeistSans; // Removed
 // const geistMono = GeistMono; // Removed
@@ -20,7 +21,9 @@ export default function RootLayout({
   return (
     <html lang="en"> {/* Removed className attribute */}
       <body className="antialiased min-h-screen flex flex-col">
-        {children}
+        <CartProvider>
+          {children}
+        </CartProvider>
         <Toaster />
       </body>
     </html>
