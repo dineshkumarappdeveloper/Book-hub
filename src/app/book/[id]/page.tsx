@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Navbar } from '@/components/navbar';
-import { SearchBar } from '@/components/search-bar'; // Placeholder for Navbar prop
+import { SearchBar } from '@/components/search-bar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { AddToCartButton } from '@/components/add-to-cart-button';
-import { getBookById, getAllBookTitles, mockBooks } from '@/lib/mockData';
+import { getBookById, getAllBookTitles, getBooks as getAllBooksForSuggestions } from '@/app/admin/actions/bookActions'; // Use new actions
 import type { Book } from '@/lib/types';
 import { suggestBooks, type BookSuggestionsInput, type BookSuggestionsOutput } from '@/ai/flows/book-suggestions';
 import { ArrowLeft, ThumbsUp, AlertTriangle, Loader2, Frown } from 'lucide-react';
@@ -17,17 +17,35 @@ import { ArrowLeft, ThumbsUp, AlertTriangle, Loader2, Frown } from 'lucide-react
 export default function BookDetailPage({ params }: { params: { id: string } }) {
   const [book, setBook] = useState<Book | null>(null);
   const [suggestedBooks, setSuggestedBooks] = useState<Book[]>([]);
+  const [isLoadingBook, setIsLoadingBook] = useState(true);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [errorBook, setErrorBook] = useState<string | null>(null);
   const [errorSuggestions, setErrorSuggestions] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState(''); // For navbar search
 
   useEffect(() => {
-    const foundBook = getBookById(params.id);
-    if (foundBook) {
-      setBook(foundBook);
-    }
     setMounted(true);
+    const fetchBook = async () => {
+      setIsLoadingBook(true);
+      setErrorBook(null);
+      try {
+        const foundBook = await getBookById(params.id);
+        if (foundBook) {
+          setBook(foundBook);
+        } else {
+          setErrorBook("Book not found.");
+        }
+      } catch (e) {
+        setErrorBook("Failed to load book details.");
+        console.error("Error fetching book by ID:", e);
+      } finally {
+        setIsLoadingBook(false);
+      }
+    };
+    if (params.id) {
+      fetchBook();
+    }
   }, [params.id]);
 
   useEffect(() => {
@@ -36,14 +54,18 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
         setIsLoadingSuggestions(true);
         setErrorSuggestions(null);
         try {
+          const allTitles = await getAllBookTitles();
           const input: BookSuggestionsInput = {
             bookTitle: book.title,
             bookDescription: book.description,
-            existingBooks: getAllBookTitles(),
+            existingBooks: allTitles,
           };
           const result: BookSuggestionsOutput = await suggestBooks(input);
-          const suggestions = mockBooks.filter(b => result.suggestedBooks.includes(b.title) && b.id !== book.id);
-          setSuggestedBooks(suggestions);
+          
+          // Fetch full book objects for suggestions to get cover images etc.
+          const allBooks = await getAllBooksForSuggestions();
+          const suggestions = allBooks.filter(b => result.suggestedBooks.includes(b.title) && b.id !== book.id);
+          setSuggestedBooks(suggestions.slice(0, 3)); // Limit to 3 suggestions
         } catch (error) {
           console.error('Error fetching book suggestions:', error);
           setErrorSuggestions('Failed to load book suggestions. Please try again later.');
@@ -55,28 +77,27 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
     }
   }, [book, mounted]);
 
-  if (!mounted) {
-    // Basic loading state to prevent hydration issues
+  if (!mounted || isLoadingBook) {
     return (
         <div className="flex flex-col min-h-screen">
         <Navbar searchBarComponent={<SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />} />
         <main className="flex-grow container mx-auto px-4 py-8">
             <div className="animate-pulse">
-                <div className="h-8 bg-muted rounded w-1/4 mb-4"></div>
+                <div className="h-8 bg-muted rounded w-1/4 mb-4"></div> {/* Back button skeleton */}
                 <div className="grid md:grid-cols-3 gap-8">
                     <div className="md:col-span-1">
                         <div className="aspect-[2/3] bg-muted rounded-lg"></div>
                     </div>
                     <div className="md:col-span-2 space-y-4">
-                        <div className="h-10 bg-muted rounded w-3/4"></div>
-                        <div className="h-6 bg-muted rounded w-1/2"></div>
-                        <div className="h-20 bg-muted rounded"></div>
-                        <div className="h-8 bg-muted rounded w-1/4"></div>
-                        <div className="h-12 bg-muted rounded w-full"></div>
+                        <div className="h-10 bg-muted rounded w-3/4"></div> {/* Title */}
+                        <div className="h-6 bg-muted rounded w-1/2"></div> {/* Author */}
+                        <div className="h-20 bg-muted rounded"></div> {/* Description */}
+                        <div className="h-8 bg-muted rounded w-1/4"></div> {/* Price */}
+                        <div className="h-12 bg-muted rounded w-full"></div> {/* Add to cart button */}
                     </div>
                 </div>
                 <div className="mt-12">
-                    <div className="h-8 bg-muted rounded w-1/3 mb-6"></div>
+                    <div className="h-8 bg-muted rounded w-1/3 mb-6"></div> {/* Suggestions title */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[1,2,3].map(i => (
                              <div key={i} className="bg-card p-4 rounded-lg shadow-md">
@@ -89,27 +110,54 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
                 </div>
             </div>
         </main>
+         <footer className="py-6 text-center text-sm text-muted-foreground border-t mt-auto">
+            © {new Date().getFullYear()} BookBuy Hub. All rights reserved.
+        </footer>
       </div>
     );
   }
 
-  if (!book) {
+  if (errorBook) {
     return (
       <div className="flex flex-col min-h-screen">
         <Navbar searchBarComponent={<SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />} />
         <main className="flex-grow container mx-auto px-4 py-8 text-center">
           <Frown className="mx-auto h-16 w-16 text-destructive mb-4" />
-          <h1 className="text-2xl font-semibold">Book Not Found</h1>
-          <p className="text-muted-foreground mb-6">The book you are looking for does not exist or may have been removed.</p>
+          <h1 className="text-2xl font-semibold">Error</h1>
+          <p className="text-muted-foreground mb-6">{errorBook}</p>
           <Button asChild variant="outline">
             <Link href="/">
               <ArrowLeft className="mr-2 h-4 w-4" /> Go Back to Storefront
             </Link>
           </Button>
         </main>
+         <footer className="py-6 text-center text-sm text-muted-foreground border-t mt-auto">
+            © {new Date().getFullYear()} BookBuy Hub. All rights reserved.
+        </footer>
       </div>
     );
   }
+  
+  if (!book) { // Should be covered by errorBook, but as a fallback
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Navbar searchBarComponent={<SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />} />
+        <main className="flex-grow container mx-auto px-4 py-8 text-center">
+          <Frown className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+          <h1 className="text-2xl font-semibold">Book Not Found</h1>
+           <Button asChild variant="outline">
+            <Link href="/">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Go Back to Storefront
+            </Link>
+          </Button>
+        </main>
+        <footer className="py-6 text-center text-sm text-muted-foreground border-t mt-auto">
+            © {new Date().getFullYear()} BookBuy Hub. All rights reserved.
+        </footer>
+      </div>
+    );
+  }
+
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -122,7 +170,7 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
         </Button>
 
         <Card className="overflow-hidden shadow-xl">
-          <div className="grid md:grid-cols-3 gap-0 md:gap-0"> {/* No gap for seamless image edge */}
+          <div className="grid md:grid-cols-3 gap-0 md:gap-0">
             <div className="md:col-span-1">
               <div className="aspect-[2/3] w-full relative">
                 <Image

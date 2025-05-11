@@ -39,12 +39,12 @@ export function EditBookDialog({ isOpen, onOpenChange, book, onSuccess }: EditBo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register, handleSubmit, reset, formState: { errors }, setValue } = useForm<BookFormData>({
     resolver: zodResolver(bookSchema),
-    defaultValues: {
-      title: book.title,
-      author: book.author,
-      description: book.description,
-      coverImage: book.coverImage,
-      price: book.price,
+    defaultValues: { // Initialized from prop, will be updated by useEffect
+      title: '',
+      author: '',
+      description: '',
+      coverImage: '',
+      price: 0,
     },
   });
 
@@ -56,15 +56,17 @@ export function EditBookDialog({ isOpen, onOpenChange, book, onSuccess }: EditBo
       setValue('coverImage', book.coverImage);
       setValue('price', book.price);
     }
-  }, [book, setValue]);
+  }, [book, setValue, isOpen]); // Rerun when isOpen changes to reset form if dialog reopens with same book
 
   const onSubmit: SubmitHandler<BookFormData> = async (data) => {
     setIsSubmitting(true);
     try {
+      // The action handles updatedAt
       await updateBookAction(book.id, data);
       toast({ title: 'Success', description: 'Book updated successfully.' });
-      reset(); // Reset form to defaultValues which should be the updated book if we were re-fetching it here
-      onSuccess();
+      // reset(); // Reset form after successful submission
+      onSuccess(); // This will trigger fetchBooks in BookManagementTab
+      onOpenChange(false); // Close dialog
     } catch (e) {
       toast({ title: 'Error', description: (e as Error).message || 'Failed to update book.', variant: 'destructive' });
     } finally {
@@ -73,10 +75,10 @@ export function EditBookDialog({ isOpen, onOpenChange, book, onSuccess }: EditBo
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { onOpenChange(open); if(!open) reset(book); }}>
+    <Dialog open={isOpen} onOpenChange={(open) => { onOpenChange(open); if(!open && book) reset(book); else if (!open) reset(); }}>
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
-          <DialogTitle>Edit Book: {book.title}</DialogTitle>
+          <DialogTitle>Edit Book: {book?.title}</DialogTitle>
           <DialogDescription>Update the details for this book.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 py-4">
@@ -106,7 +108,7 @@ export function EditBookDialog({ isOpen, onOpenChange, book, onSuccess }: EditBo
             {errors.price && <p className="col-span-4 text-destructive text-xs text-right">{errors.price.message}</p>}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => { onOpenChange(false); reset(book); }}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => { onOpenChange(false); if(book) reset(book); else reset(); }}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>

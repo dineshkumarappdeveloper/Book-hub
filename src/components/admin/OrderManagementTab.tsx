@@ -25,7 +25,6 @@ export function OrderManagementTab() {
     setError(null);
     try {
       const fetchedOrders = await getOrders();
-      // Server actions for RTDB should convert numeric timestamps to Date objects
       setOrders(fetchedOrders);
     } catch (e) {
       setError((e as Error).message || 'Failed to fetch orders.');
@@ -49,23 +48,13 @@ export function OrderManagementTab() {
     }
   };
   
-  const formatDate = (dateInput?: Date | number | string): string => {
-    if (!dateInput) return 'N/A';
-    let date: Date;
-     if (dateInput instanceof Date) {
-        date = dateInput;
-    } else if (typeof dateInput === 'number' || typeof dateInput === 'string') {
-      date = new Date(dateInput);
-    } else {
-      const anyDateInput = dateInput as any;
-      if (anyDateInput.toDate && typeof anyDateInput.toDate === 'function') {
-          date = anyDateInput.toDate();
-      } else {
-        return 'Invalid Date Input';
-      }
+  const formatDateTimestamp = (timestamp?: number): string => {
+    if (timestamp === undefined || timestamp === null) return 'N/A';
+     try {
+      return format(new Date(timestamp), 'PPpp');
+    } catch (e) {
+      return 'Invalid Date';
     }
-    if (isNaN(date.getTime())) return 'Invalid Date';
-    return format(date, 'PPpp');
   };
 
   const openOrderDetailModal = async (orderId: string) => {
@@ -127,9 +116,9 @@ export function OrderManagementTab() {
           ) : (
             orders.map((order) => (
               <TableRow key={order.id}>
-                <TableCell className="font-medium truncate max-w-[100px]" title={order.id}>{order.id.substring(0,8)}...</TableCell>
+                <TableCell className="font-medium truncate max-w-[100px]" title={order.id}>{order.id.substring(0,13)}...</TableCell>
                 <TableCell>{order.deliveryInfo.name} ({order.deliveryInfo.email})</TableCell>
-                <TableCell>{formatDate(order.orderDate)}</TableCell>
+                <TableCell>{formatDateTimestamp(order.orderDate)}</TableCell>
                 <TableCell>${order.totalAmount.toFixed(2)}</TableCell>
                 <TableCell>
                   <Select
@@ -162,9 +151,9 @@ export function OrderManagementTab() {
         <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Order Details: #{selectedOrder.id.substring(0,8)}...</DialogTitle>
+              <DialogTitle>Order Details: #{selectedOrder.id.substring(0,13)}...</DialogTitle>
               <DialogDescription>
-                Placed on {formatDate(selectedOrder.orderDate)} by {selectedOrder.deliveryInfo.name}
+                Placed on {formatDateTimestamp(selectedOrder.orderDate)} by {selectedOrder.deliveryInfo.name}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">

@@ -4,18 +4,33 @@ import { useState, useEffect, useMemo } from 'react';
 import { Navbar } from '@/components/navbar';
 import { SearchBar } from '@/components/search-bar';
 import { BookCard } from '@/components/book-card';
-import { mockBooks } from '@/lib/mockData';
+import { getBooks } from '@/app/admin/actions/bookActions'; // Use new actions
 import type { Book } from '@/lib/types';
-import { Frown } from 'lucide-react';
+import { Frown, Loader2 } from 'lucide-react';
 
 export default function StorefrontPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [books, setBooks] = useState<Book[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setBooks(mockBooks);
-    setMounted(true); // Ensures client-side specific logic runs after mount
+    setMounted(true);
+    const fetchBooks = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const fetchedBooks = await getBooks();
+        setBooks(fetchedBooks);
+      } catch (e) {
+        setError('Failed to load books. Please try again later.');
+        console.error("Failed to fetch books for storefront:", e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchBooks();
   }, []);
 
   const filteredBooks = useMemo(() => {
@@ -27,12 +42,12 @@ export default function StorefrontPage() {
     );
   }, [searchQuery, books]);
 
-  if (!mounted) {
-    // Optional: Render a loading state or null to avoid hydration mismatch issues with search
+  if (!mounted || isLoading && books.length === 0) { // Show full page skeleton if loading and no books yet
     return (
       <div className="flex flex-col min-h-screen">
         <Navbar searchBarComponent={<SearchBar searchQuery="" setSearchQuery={() => {}} />} />
         <main className="flex-grow container mx-auto px-4 py-8">
+           <div className="h-8 bg-muted rounded w-1/3 mb-8 mx-auto animate-pulse"></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {Array.from({ length: 8 }).map((_, index) => (
               <div key={index} className="bg-card p-4 rounded-lg shadow-md animate-pulse">
@@ -50,23 +65,54 @@ export default function StorefrontPage() {
       </div>
     );
   }
+  
+  if (error) {
+     return (
+      <div className="flex flex-col min-h-screen">
+        <Navbar searchBarComponent={<SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />} />
+        <main className="flex-grow container mx-auto px-4 py-8 text-center">
+          <Frown className="mx-auto h-12 w-12 text-destructive mb-4" />
+          <h1 className="text-2xl font-semibold">Error Loading Books</h1>
+          <p className="text-muted-foreground">{error}</p>
+        </main>
+         <footer className="py-6 text-center text-sm text-muted-foreground border-t mt-auto">
+          © {new Date().getFullYear()} BookBuy Hub. All rights reserved.
+        </footer>
+      </div>
+    );
+  }
+
 
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar searchBarComponent={<SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />} />
       <main className="flex-grow container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-8 text-center text-primary">Discover Your Next Read</h1>
-        {filteredBooks.length > 0 ? (
+        {isLoading && books.length === 0 && (
+             <div className="flex justify-center items-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="ml-2 text-muted-foreground">Loading books...</p>
+            </div>
+        )}
+        {!isLoading && !error && filteredBooks.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredBooks.map((book) => (
               <BookCard key={book.id} book={book} />
             ))}
           </div>
-        ) : (
+        )}
+        {!isLoading && !error && filteredBooks.length === 0 && books.length > 0 && (
           <div className="text-center py-10">
             <Frown className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-xl text-muted-foreground">No books found matching your search.</p>
             <p className="text-sm text-muted-foreground">Try a different title or author.</p>
+          </div>
+        )}
+         {!isLoading && !error && books.length === 0 && (
+          <div className="text-center py-10">
+            <Frown className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-xl text-muted-foreground">No books available at the moment.</p>
+            <p className="text-sm text-muted-foreground">Please check back later.</p>
           </div>
         )}
       </main>

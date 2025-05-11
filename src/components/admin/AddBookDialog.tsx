@@ -43,10 +43,12 @@ export function AddBookDialog({ isOpen, onOpenChange, onSuccess }: AddBookDialog
   const onSubmit: SubmitHandler<BookFormData> = async (data) => {
     setIsSubmitting(true);
     try {
+      // The action now handles createdAt and updatedAt
       await addBookAction(data as Omit<Book, 'id' | 'createdAt' | 'updatedAt'>);
       toast({ title: 'Success', description: 'Book added successfully.' });
       reset();
-      onSuccess();
+      onSuccess(); // This will trigger fetchBooks in BookManagementTab
+      onOpenChange(false); // Close dialog on success
     } catch (e) {
       toast({ title: 'Error', description: (e as Error).message || 'Failed to add book.', variant: 'destructive' });
     } finally {
@@ -79,7 +81,7 @@ export function AddBookDialog({ isOpen, onOpenChange, onSuccess }: AddBookDialog
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="coverImage" className="text-right">Cover Image URL</Label>
-            <Input id="coverImage" {...register('coverImage')} className="col-span-3" placeholder="https://example.com/image.jpg" />
+            <Input id="coverImage" {...register('coverImage')} className="col-span-3" placeholder="https://picsum.photos/seed/newbook/300/450" />
             {errors.coverImage && <p className="col-span-4 text-destructive text-xs text-right">{errors.coverImage.message}</p>}
           </div>
           <div className="grid grid-cols-4 items-center gap-4">

@@ -20,7 +20,6 @@ export function UserManagementTab() {
     setError(null);
     try {
       const fetchedCustomers = await getCustomerProfiles();
-      // Server actions for RTDB should convert numeric timestamps to Date objects
       setCustomers(fetchedCustomers);
     } catch (e) {
       setError((e as Error).message || 'Failed to fetch customer profiles.');
@@ -34,23 +33,13 @@ export function UserManagementTab() {
     fetchCustomers();
   }, [fetchCustomers]);
 
-  const formatDate = (dateInput?: Date | number | string): string => {
-    if (!dateInput) return 'N/A';
-    let date: Date;
-     if (dateInput instanceof Date) {
-        date = dateInput;
-    } else if (typeof dateInput === 'number' || typeof dateInput === 'string') {
-      date = new Date(dateInput);
-    } else {
-       const anyDateInput = dateInput as any;
-      if (anyDateInput.toDate && typeof anyDateInput.toDate === 'function') {
-          date = anyDateInput.toDate();
-      } else {
-        return 'Invalid Date Input';
-      }
+  const formatDateTimestamp = (timestamp?: number): string => {
+    if (timestamp === undefined || timestamp === null) return 'N/A';
+    try {
+      return format(new Date(timestamp), 'PP'); // Format as 'Month day, year'
+    } catch (e) {
+      return 'Invalid Date';
     }
-    if (isNaN(date.getTime())) return 'Invalid Date';
-    return format(date, 'PP'); // Format as 'Month day, year'
   };
 
   if (isLoading) {
@@ -104,7 +93,7 @@ export function UserManagementTab() {
                 <TableCell>{customer.email}</TableCell>
                 <TableCell>{customer.totalOrders || 0}</TableCell>
                 <TableCell>${(customer.totalSpent || 0).toFixed(2)}</TableCell>
-                <TableCell>{formatDate(customer.lastOrderDate)}</TableCell>
+                <TableCell>{formatDateTimestamp(customer.lastOrderDate)}</TableCell>
               </TableRow>
             ))
           )}

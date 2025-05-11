@@ -1,11 +1,10 @@
 'use server';
 
-import { database } from '@/lib/firebase/admin';
-import type { Order, OrderItem } from '@/lib/types';
+// No longer importing from '@/lib/firebase/admin'
+// Import the new mock order action
+import { createOrder as createMockOrder } from '@/app/admin/actions/orderActions'; 
+import type { OrderItem } from '@/lib/types';
 import type { DeliveryInfo } from '@/lib/schemas';
-import admin from 'firebase-admin';
-
-const ORDERS_REF = 'orders';
 
 interface CreateOrderInput {
   deliveryInfo: DeliveryInfo;
@@ -16,27 +15,20 @@ interface CreateOrderInput {
 
 export async function createOrder(orderInput: CreateOrderInput): Promise<{ orderId: string }> {
   try {
-    const newOrderRef = database.ref(ORDERS_REF).push();
-    const timestamp = admin.database.ServerValue.TIMESTAMP;
-
-    // Ensure items are plain objects, not Firestore-specific or other complex types if they were
+    // Ensure items are plain objects
     const plainItems = orderInput.items.map(item => ({ ...item }));
 
-
-    const orderData: Omit<Order, 'id' | 'orderDate'> & { orderDate: object } = {
+    // Call the mock order creation function
+    const { orderId } = await createMockOrder({
       deliveryInfo: orderInput.deliveryInfo,
       items: plainItems,
       totalAmount: orderInput.totalAmount,
-      status: 'Pending',
-      orderDate: timestamp, // ServerValue.TIMESTAMP placeholder
       ...(orderInput.userId && { userId: orderInput.userId }),
-    };
+    });
 
-    await newOrderRef.set(orderData);
-
-    return { orderId: newOrderRef.key! };
+    return { orderId };
   } catch (error) {
-    console.error("Error creating order in RTDB:", error);
+    console.error("Error creating mock order:", error);
     throw new Error("Failed to create order. Please try again.");
   }
 }

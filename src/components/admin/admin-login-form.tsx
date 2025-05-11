@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { LogIn, Loader2 } from 'lucide-react';
-import { verifyAdminUser } from '@/app/admin/actions/adminAuthActions';
+// import { verifyAdminUser } from '@/app/admin/actions/adminAuthActions'; // Firebase action removed
 
 interface AdminLoginFormProps {
   onLoginSuccess: () => void;
@@ -29,33 +29,24 @@ export function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps) {
     if (!mounted) return;
     setIsLoading(true);
 
-    try {
-      const result = await verifyAdminUser(username, password);
-      if (result.success) {
-        toast({ title: 'Login Successful', description: 'Welcome, Admin!', duration: 3000 });
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('isAdminLoggedIn', 'true');
-        }
-        onLoginSuccess();
-      } else {
-        toast({
-          title: 'Login Failed',
-          description: result.message || 'Invalid username or password.',
-          variant: 'destructive',
-          duration: 3000,
-        });
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    if (username === 'admin' && password === 'admin') {
+      toast({ title: 'Login Successful', description: 'Welcome, Admin!', duration: 3000 });
+      if (typeof window !== 'undefined') {
+          localStorage.setItem('isAdminLoggedIn', 'true');
       }
-    } catch (error) {
-        toast({
-            title: 'Login Error',
-            description: 'An unexpected error occurred.',
-            variant: 'destructive',
-            duration: 3000,
-        });
-        console.error("Login form error:", error);
-    } finally {
-        setIsLoading(false);
+      onLoginSuccess();
+    } else {
+      toast({
+        title: 'Login Failed',
+        description: 'Invalid username or password.',
+        variant: 'destructive',
+        duration: 3000,
+      });
     }
+    setIsLoading(false);
   };
   
   if (!mounted) {
@@ -88,7 +79,7 @@ export function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps) {
         <CardTitle className="text-2xl font-bold text-primary flex items-center">
           <LogIn className="mr-2 h-6 w-6" /> Admin Login
         </CardTitle>
-        <CardDescription>Enter your credentials to access the admin panel.</CardDescription>
+        <CardDescription>Enter your credentials to access the admin panel. (admin/admin)</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">

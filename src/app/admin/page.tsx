@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { AdminLoginForm } from '@/components/admin/admin-login-form';
-import { AdminDashboard } from '@/components/admin/AdminDashboard'; // Corrected import path
+import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { BookOpenText, ArrowLeft, UserPlus } from 'lucide-react';
+import { BookOpenText, ArrowLeft } from 'lucide-react';
 
-// const ADMIN_USERS_KEY = 'adminUsers'; // No longer used for storing users here
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -35,7 +34,6 @@ export default function AdminPage() {
     setIsLoggedIn(false);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('isAdminLoggedIn');
-      // Optionally, redirect to login or home page
     }
   };
 
@@ -68,14 +66,7 @@ export default function AdminPage() {
       ) : (
         <div className="w-full max-w-sm">
           <AdminLoginForm onLoginSuccess={handleLoginSuccess} />
-          <div className="mt-6 text-center">
-            <Button variant="link" asChild className="text-sm text-primary hover:text-accent">
-              <Link href="/admin/signup">
-                <UserPlus className="mr-2 h-4 w-4" />
-                Create a new Admin Account
-              </Link>
-            </Button>
-          </div>
+          {/* Signup link removed as admin is hardcoded */}
         </div>
       )}
       <footer className="absolute bottom-4 text-center text-sm text-muted-foreground">

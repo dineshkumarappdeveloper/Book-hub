@@ -1,9 +1,4 @@
 
-// Note: Firebase Client SDK's Timestamp is different from Admin SDK's.
-// For Realtime Database, timestamps are typically stored as numbers (milliseconds since epoch)
-// or using ServerValue.TIMESTAMP. When fetched, they are numbers.
-// We will use `number | Date` where Date is the representation after conversion in server actions.
-
 import type { DeliveryInfo } from './schemas';
 
 export interface Book {
@@ -13,8 +8,8 @@ export interface Book {
   description: string;
   coverImage: string; // URL to the image
   price: number;
-  createdAt?: number | Date; // RTDB: number (ms since epoch) or ServerValue.TIMESTAMP placeholder
-  updatedAt?: number | Date;
+  createdAt?: number; // Timestamp as number (e.g., Date.now())
+  updatedAt?: number; // Timestamp as number
 }
 
 export interface CartItem extends Book {
@@ -35,17 +30,18 @@ export interface Order {
   items: OrderItem[];
   totalAmount: number;
   status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
-  orderDate: number | Date; // RTDB: number (ms since epoch) or ServerValue.TIMESTAMP placeholder
-  updatedAt?: number | Date; // Optional: for tracking order updates
+  orderDate: number; // Timestamp as number
+  updatedAt?: number; // Optional: for tracking order updates
   userId?: string; // Optional: if you have user accounts
 }
 
+// Simplified for mock auth, password stored directly (NOT FOR PRODUCTION)
 export interface AdminUser {
   id: string;
   username: string;
-  passwordHash: string; // In a real app, this MUST be a securely hashed password.
+  password?: string; // For mock purposes, store plaintext
   role: 'admin';
-  createdAt: number | Date;
+  createdAt: number;
 }
 
 // For "Users" tab in admin, representing customers
@@ -53,8 +49,8 @@ export interface CustomerProfile {
   id: string; // could be email or a generated ID
   name: string;
   email: string;
-  firstOrderDate?: number | Date;
-  lastOrderDate?: number | Date;
+  firstOrderDate?: number;
+  lastOrderDate?: number;
   totalOrders?: number;
   totalSpent?: number;
 }
