@@ -16,8 +16,7 @@ export default function AdminSignupPage() {
   }, []);
 
   const handleSignupSuccess = () => {
-    // Optionally auto-login or redirect to login page
-    // For now, redirect to admin login page
+    // Redirect to admin login page after successful signup
     router.push('/admin');
   };
   

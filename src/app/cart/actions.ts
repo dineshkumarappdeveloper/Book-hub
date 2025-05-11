@@ -1,12 +1,11 @@
-
 'use server';
 
-import { firestore } from '@/lib/firebase/admin';
+import { database } from '@/lib/firebase/admin';
 import type { Order, OrderItem } from '@/lib/types';
 import type { DeliveryInfo } from '@/lib/schemas';
-import { FieldValue } from 'firebase-admin/firestore';
+import admin from 'firebase-admin';
 
-const ORDERS_COLLECTION = 'orders';
+const ORDERS_REF = 'orders';
 
 interface CreateOrderInput {
   deliveryInfo: DeliveryInfo;
@@ -17,23 +16,27 @@ interface CreateOrderInput {
 
 export async function createOrder(orderInput: CreateOrderInput): Promise<{ orderId: string }> {
   try {
-    const newOrderRef = firestore.collection(ORDERS_COLLECTION).doc();
-    const timestamp = FieldValue.serverTimestamp();
+    const newOrderRef = database.ref(ORDERS_REF).push();
+    const timestamp = admin.database.ServerValue.TIMESTAMP;
 
-    const orderData: Omit<Order, 'id'> & { orderDate: FieldValue } = {
+    // Ensure items are plain objects, not Firestore-specific or other complex types if they were
+    const plainItems = orderInput.items.map(item => ({ ...item }));
+
+
+    const orderData: Omit<Order, 'id' | 'orderDate'> & { orderDate: object } = {
       deliveryInfo: orderInput.deliveryInfo,
-      items: orderInput.items,
+      items: plainItems,
       totalAmount: orderInput.totalAmount,
       status: 'Pending',
-      orderDate: timestamp,
+      orderDate: timestamp, // ServerValue.TIMESTAMP placeholder
       ...(orderInput.userId && { userId: orderInput.userId }),
     };
 
     await newOrderRef.set(orderData);
 
-    return { orderId: newOrderRef.id };
+    return { orderId: newOrderRef.key! };
   } catch (error) {
-    console.error("Error creating order:", error);
+    console.error("Error creating order in RTDB:", error);
     throw new Error("Failed to create order. Please try again.");
   }
 }

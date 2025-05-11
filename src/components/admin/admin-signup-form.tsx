@@ -6,33 +6,27 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Loader2 } from 'lucide-react';
+import { createAdminUser } from '@/app/admin/actions/adminAuthActions';
 
 interface AdminSignupFormProps {
   onSignupSuccess: () => void;
 }
 
-const ADMIN_USERS_KEY = 'adminUsers';
-
 export function AdminSignupForm({ onSignupSuccess }: AdminSignupFormProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    if (typeof window !== 'undefined') {
-        const existingUsers = localStorage.getItem(ADMIN_USERS_KEY);
-        if (!existingUsers) {
-            localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify([{ username: 'admin', password: 'password' }]));
-        }
-    }
   }, []);
 
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!mounted) return;
 
@@ -56,24 +50,31 @@ export function AdminSignupForm({ onSignupSuccess }: AdminSignupFormProps) {
       return;
     }
     
-    const storedUsers = localStorage.getItem(ADMIN_USERS_KEY);
-    const adminUsers = storedUsers ? JSON.parse(storedUsers) : [];
-
-    if (adminUsers.find((user: any) => user.username === username)) {
-      toast({
-        title: 'Signup Failed',
-        description: 'Username already exists.',
-        variant: 'destructive',
-        duration: 3000,
-      });
-      return;
+    setIsLoading(true);
+    try {
+        const result = await createAdminUser(username, password);
+        if (result.success) {
+            toast({ title: 'Signup Successful', description: result.message, duration: 3000 });
+            onSignupSuccess();
+        } else {
+            toast({
+                title: 'Signup Failed',
+                description: result.message,
+                variant: 'destructive',
+                duration: 3000,
+            });
+        }
+    } catch (error) {
+        toast({
+            title: 'Signup Error',
+            description: 'An unexpected error occurred during signup.',
+            variant: 'destructive',
+            duration: 3000,
+        });
+        console.error("Signup form error:", error);
+    } finally {
+        setIsLoading(false);
     }
-
-    adminUsers.push({ username, password });
-    localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify(adminUsers));
-
-    toast({ title: 'Signup Successful', description: 'Admin account created. Please login.', duration: 3000 });
-    onSignupSuccess();
   };
 
   if (!mounted) {
@@ -110,7 +111,9 @@ export function AdminSignupForm({ onSignupSuccess }: AdminSignupFormProps) {
         <CardTitle className="text-2xl font-bold text-primary flex items-center">
           <UserPlus className="mr-2 h-6 w-6" /> Admin Signup
         </CardTitle>
-        <CardDescription>Create a new administrator account.</CardDescription>
+        <CardDescription>Create a new administrator account.
+          <br/><strong className="text-destructive">Warning: Passwords are not securely hashed in this demo.</strong>
+        </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
@@ -124,6 +127,7 @@ export function AdminSignupForm({ onSignupSuccess }: AdminSignupFormProps) {
               onChange={(e) => setUsername(e.target.value)}
               required
               className="focus-visible:ring-accent"
+              disabled={isLoading}
             />
           </div>
           <div className="space-y-2">
@@ -136,6 +140,7 @@ export function AdminSignupForm({ onSignupSuccess }: AdminSignupFormProps) {
               onChange={(e) => setPassword(e.target.value)}
               required
               className="focus-visible:ring-accent"
+              disabled={isLoading}
             />
           </div>
           <div className="space-y-2">
@@ -148,12 +153,14 @@ export function AdminSignupForm({ onSignupSuccess }: AdminSignupFormProps) {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               className="focus-visible:ring-accent"
+              disabled={isLoading}
             />
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-            Create Account
+          <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isLoading}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {isLoading ? 'Creating Account...' : 'Create Account'}
           </Button>
         </CardFooter>
       </form>

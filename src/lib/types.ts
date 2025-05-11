@@ -1,5 +1,9 @@
 
-import type { Timestamp } from 'firebase/firestore'; // For client-side, admin SDK uses its own
+// Note: Firebase Client SDK's Timestamp is different from Admin SDK's.
+// For Realtime Database, timestamps are typically stored as numbers (milliseconds since epoch)
+// or using ServerValue.TIMESTAMP. When fetched, they are numbers.
+// We will use `number | Date` where Date is the representation after conversion in server actions.
+
 import type { DeliveryInfo } from './schemas';
 
 export interface Book {
@@ -9,8 +13,8 @@ export interface Book {
   description: string;
   coverImage: string; // URL to the image
   price: number;
-  createdAt?: Timestamp | Date; // Allow Date for server actions, Timestamp for Firestore
-  updatedAt?: Timestamp | Date;
+  createdAt?: number | Date; // RTDB: number (ms since epoch) or ServerValue.TIMESTAMP placeholder
+  updatedAt?: number | Date;
 }
 
 export interface CartItem extends Book {
@@ -31,17 +35,17 @@ export interface Order {
   items: OrderItem[];
   totalAmount: number;
   status: 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
-  orderDate: Timestamp | Date; // Firestore Timestamp
+  orderDate: number | Date; // RTDB: number (ms since epoch) or ServerValue.TIMESTAMP placeholder
+  updatedAt?: number | Date; // Optional: for tracking order updates
   userId?: string; // Optional: if you have user accounts
 }
 
-// For clarity, if we were to manage admin users in Firestore
-export interface AdminUserInfo {
-  uid: string;
+export interface AdminUser {
+  id: string;
   username: string;
-  // passwordHash: string; // Store hash, not plain password
+  passwordHash: string; // In a real app, this MUST be a securely hashed password.
   role: 'admin';
-  createdAt: Timestamp | Date;
+  createdAt: number | Date;
 }
 
 // For "Users" tab in admin, representing customers
@@ -49,8 +53,8 @@ export interface CustomerProfile {
   id: string; // could be email or a generated ID
   name: string;
   email: string;
-  firstOrderDate?: Timestamp | Date;
-  lastOrderDate?: Timestamp | Date;
+  firstOrderDate?: number | Date;
+  lastOrderDate?: number | Date;
   totalOrders?: number;
   totalSpent?: number;
 }

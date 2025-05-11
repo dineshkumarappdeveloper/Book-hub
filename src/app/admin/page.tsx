@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { AdminLoginForm } from '@/components/admin/admin-login-form';
-import { AdminDashboard } from '@/components/admin/admin-dashboard';
+import { AdminDashboard } from '@/components/admin/AdminDashboard'; // Corrected import path
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { BookOpenText, ArrowLeft, UserPlus } from 'lucide-react';
 
-const ADMIN_USERS_KEY = 'adminUsers';
+// const ADMIN_USERS_KEY = 'adminUsers'; // No longer used for storing users here
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -15,13 +15,8 @@ export default function AdminPage() {
 
   useEffect(() => {
     setMounted(true);
-    // Initialize admin users in localStorage if not present
+    // Check login status from localStorage
     if (typeof window !== 'undefined') {
-      const existingUsers = localStorage.getItem(ADMIN_USERS_KEY);
-      if (!existingUsers) {
-        localStorage.setItem(ADMIN_USERS_KEY, JSON.stringify([{ username: 'admin', password: 'password' }]));
-      }
-      
       const loggedInStatus = localStorage.getItem('isAdminLoggedIn');
       if (loggedInStatus === 'true') {
         setIsLoggedIn(true);
@@ -40,6 +35,7 @@ export default function AdminPage() {
     setIsLoggedIn(false);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('isAdminLoggedIn');
+      // Optionally, redirect to login or home page
     }
   };
 
@@ -63,7 +59,7 @@ export default function AdminPage() {
       </div>
       
       {isLoggedIn ? (
-        <div className="w-full max-w-2xl">
+        <div className="w-full max-w-4xl"> {/* Increased max-width for dashboard */}
           <AdminDashboard />
           <Button onClick={handleLogout} variant="destructive" className="mt-6 w-full max-w-xs mx-auto flex">
             Logout

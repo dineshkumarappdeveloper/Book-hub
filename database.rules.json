@@ -1,0 +1,26 @@
+
+{
+  "rules": {
+    // Public read access for books (example, adjust as needed)
+    "books": {
+      ".read": true,
+      ".write": false, // Writes should go through admin SDK / server actions
+      ".indexOn": ["createdAt"] // Index for ordering books
+    },
+    // Orders are private, only accessible via admin SDK / server actions
+    "orders": {
+      ".read": false,
+      ".write": false,
+      ".indexOn": ["orderDate", "userId"] // Index for ordering/filtering orders
+    },
+    // Admin users, private, only accessible via admin SDK / server actions
+    "adminUsers": {
+        ".read": false,
+        ".write": false,
+        ".indexOn": ["username"] // Index for looking up admin users by username
+    }
+    // Default deny all other paths
+    // ".read": false,
+    // ".write": false
+  }
+}

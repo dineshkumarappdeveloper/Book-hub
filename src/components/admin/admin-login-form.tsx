@@ -6,17 +6,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { LogIn } from 'lucide-react';
+import { LogIn, Loader2 } from 'lucide-react';
+import { verifyAdminUser } from '@/app/admin/actions/adminAuthActions';
 
 interface AdminLoginFormProps {
   onLoginSuccess: () => void;
 }
 
-const ADMIN_USERS_KEY = 'adminUsers';
-
 export function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
 
@@ -24,27 +24,37 @@ export function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps) {
       setMounted(true);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mounted || typeof window === 'undefined') return;
+    if (!mounted) return;
+    setIsLoading(true);
 
-    const storedUsers = localStorage.getItem(ADMIN_USERS_KEY);
-    const adminUsers = storedUsers ? JSON.parse(storedUsers) : [];
-    
-    const foundUser = adminUsers.find(
-      (user: any) => user.username === username && user.password === password
-    );
-
-    if (foundUser) {
-      toast({ title: 'Login Successful', description: 'Welcome, Admin!', duration: 3000 });
-      onLoginSuccess();
-    } else {
-      toast({
-        title: 'Login Failed',
-        description: 'Invalid username or password.',
-        variant: 'destructive',
-        duration: 3000,
-      });
+    try {
+      const result = await verifyAdminUser(username, password);
+      if (result.success) {
+        toast({ title: 'Login Successful', description: 'Welcome, Admin!', duration: 3000 });
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('isAdminLoggedIn', 'true');
+        }
+        onLoginSuccess();
+      } else {
+        toast({
+          title: 'Login Failed',
+          description: result.message || 'Invalid username or password.',
+          variant: 'destructive',
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+        toast({
+            title: 'Login Error',
+            description: 'An unexpected error occurred.',
+            variant: 'destructive',
+            duration: 3000,
+        });
+        console.error("Login form error:", error);
+    } finally {
+        setIsLoading(false);
     }
   };
   
@@ -92,6 +102,7 @@ export function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps) {
               onChange={(e) => setUsername(e.target.value)}
               required
               className="focus-visible:ring-accent"
+              disabled={isLoading}
             />
           </div>
           <div className="space-y-2">
@@ -104,12 +115,14 @@ export function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps) {
               onChange={(e) => setPassword(e.target.value)}
               required
               className="focus-visible:ring-accent"
+              disabled={isLoading}
             />
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-            Login
+          <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isLoading}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {isLoading ? 'Logging in...' : 'Login'}
           </Button>
         </CardFooter>
       </form>

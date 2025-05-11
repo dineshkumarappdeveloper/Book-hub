@@ -1,16 +1,15 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getOrders, updateOrderStatus } from '@/app/admin/actions/orderActions';
+import { getOrders, updateOrderStatus, getOrderById } from '@/app/admin/actions/orderActions';
 import type { Order } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertTriangle, RefreshCw, PackageSearch, Eye } from 'lucide-react';
 import { format } from 'date-fns';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import Image from 'next/image';
 
 export function OrderManagementTab() {
@@ -26,12 +25,8 @@ export function OrderManagementTab() {
     setError(null);
     try {
       const fetchedOrders = await getOrders();
-      // Ensure orderDate are Date objects for formatting
-      const processedOrders = fetchedOrders.map(order => ({
-        ...order,
-        orderDate: order.orderDate && typeof (order.orderDate as any).toDate === 'function' ? (order.orderDate as any).toDate() : order.orderDate,
-      }));
-      setOrders(processedOrders);
+      // Server actions for RTDB should convert numeric timestamps to Date objects
+      setOrders(fetchedOrders);
     } catch (e) {
       setError((e as Error).message || 'Failed to fetch orders.');
       toast({ title: 'Error', description: (e as Error).message, variant: 'destructive' });
@@ -47,34 +42,40 @@ export function OrderManagementTab() {
   const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
     try {
       await updateOrderStatus(orderId, newStatus);
-      toast({ title: 'Success', description: `Order ${orderId} status updated to ${newStatus}.` });
+      toast({ title: 'Success', description: `Order ${orderId.substring(0,8)}... status updated to ${newStatus}.` });
       fetchOrders(); // Refresh orders list
     } catch (e) {
       toast({ title: 'Error', description: (e as Error).message || 'Failed to update order status.', variant: 'destructive' });
     }
   };
   
-  const formatDate = (dateInput?: Date | {toDate: () => Date} | any): string => {
+  const formatDate = (dateInput?: Date | number | string): string => {
     if (!dateInput) return 'N/A';
     let date: Date;
-    if (dateInput.toDate && typeof dateInput.toDate === 'function') {
-        date = dateInput.toDate();
-    } else if (dateInput instanceof Date) {
+     if (dateInput instanceof Date) {
         date = dateInput;
+    } else if (typeof dateInput === 'number' || typeof dateInput === 'string') {
+      date = new Date(dateInput);
     } else {
-       try {
-        date = new Date(dateInput);
-        if (isNaN(date.getTime())) return 'Invalid Date';
-      } catch (e) {
-        return 'Invalid Date';
+      const anyDateInput = dateInput as any;
+      if (anyDateInput.toDate && typeof anyDateInput.toDate === 'function') {
+          date = anyDateInput.toDate();
+      } else {
+        return 'Invalid Date Input';
       }
     }
+    if (isNaN(date.getTime())) return 'Invalid Date';
     return format(date, 'PPpp');
   };
 
-  const openOrderDetailModal = (order: Order) => {
-    setSelectedOrder(order);
-    setIsDetailModalOpen(true);
+  const openOrderDetailModal = async (orderId: string) => {
+    const orderDetails = await getOrderById(orderId);
+    if (orderDetails) {
+        setSelectedOrder(orderDetails);
+        setIsDetailModalOpen(true);
+    } else {
+        toast({ title: 'Error', description: 'Could not fetch order details.', variant: 'destructive'});
+    }
   };
 
 
@@ -98,8 +99,9 @@ export function OrderManagementTab() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold text-primary">Manage Orders</h2>
-         <Button onClick={fetchOrders} variant="outline" size="sm">
-            <RefreshCw className="mr-2 h-4 w-4" /> Refresh Orders
+         <Button onClick={fetchOrders} variant="outline" size="sm" disabled={isLoading}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />} 
+            Refresh Orders
         </Button>
       </div>
 
@@ -125,7 +127,7 @@ export function OrderManagementTab() {
           ) : (
             orders.map((order) => (
               <TableRow key={order.id}>
-                <TableCell className="font-medium truncate max-w-[100px]">{order.id}</TableCell>
+                <TableCell className="font-medium truncate max-w-[100px]" title={order.id}>{order.id.substring(0,8)}...</TableCell>
                 <TableCell>{order.deliveryInfo.name} ({order.deliveryInfo.email})</TableCell>
                 <TableCell>{formatDate(order.orderDate)}</TableCell>
                 <TableCell>${order.totalAmount.toFixed(2)}</TableCell>
@@ -147,7 +149,7 @@ export function OrderManagementTab() {
                   </Select>
                 </TableCell>
                 <TableCell>
-                  <Button variant="outline" size="sm" onClick={() => openOrderDetailModal(order)}>
+                  <Button variant="outline" size="sm" onClick={() => openOrderDetailModal(order.id)}>
                     <Eye className="h-4 w-4 mr-1 sm:mr-2" /> <span className="hidden sm:inline">Details</span>
                   </Button>
                 </TableCell>
@@ -178,19 +180,26 @@ export function OrderManagementTab() {
                 <div><strong>Status:</strong> <span className="font-semibold">{selectedOrder.status}</span></div>
               </div>
               <h4 className="font-semibold mt-2">Items:</h4>
-              <ul className="space-y-2">
-                {selectedOrder.items.map(item => (
-                  <li key={item.bookId} className="flex items-center space-x-3 border-b pb-2">
-                    <Image src={item.coverImage} alt={item.title} width={40} height={60} className="rounded object-cover" data-ai-hint="book cover small" />
-                    <div className="flex-grow">
-                      <p className="font-medium">{item.title}</p>
-                      <p className="text-xs text-muted-foreground">Qty: {item.quantity} @ ${item.price.toFixed(2)}</p>
-                    </div>
-                    <p className="font-semibold">${(item.quantity * item.price).toFixed(2)}</p>
-                  </li>
-                ))}
-              </ul>
+              {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                <ul className="space-y-2">
+                  {selectedOrder.items.map(item => (
+                    <li key={item.bookId || item.title} className="flex items-center space-x-3 border-b pb-2">
+                      <Image src={item.coverImage || "https://picsum.photos/seed/defaultbook/40/60"} alt={item.title} width={40} height={60} className="rounded object-cover" data-ai-hint="book cover small" />
+                      <div className="flex-grow">
+                        <p className="font-medium">{item.title}</p>
+                        <p className="text-xs text-muted-foreground">Qty: {item.quantity} @ ${item.price.toFixed(2)}</p>
+                      </div>
+                      <p className="font-semibold">${(item.quantity * item.price).toFixed(2)}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground">No items found in this order.</p>
+              )}
             </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDetailModalOpen(false)}>Close</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}

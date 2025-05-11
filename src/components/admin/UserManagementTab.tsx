@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -21,6 +20,7 @@ export function UserManagementTab() {
     setError(null);
     try {
       const fetchedCustomers = await getCustomerProfiles();
+      // Server actions for RTDB should convert numeric timestamps to Date objects
       setCustomers(fetchedCustomers);
     } catch (e) {
       setError((e as Error).message || 'Failed to fetch customer profiles.');
@@ -34,22 +34,23 @@ export function UserManagementTab() {
     fetchCustomers();
   }, [fetchCustomers]);
 
-  const formatDate = (dateInput?: Date | {toDate: () => Date} | any): string => {
+  const formatDate = (dateInput?: Date | number | string): string => {
     if (!dateInput) return 'N/A';
     let date: Date;
-     if (dateInput.toDate && typeof dateInput.toDate === 'function') { // Firestore Admin Timestamp
-        date = dateInput.toDate();
-    } else if (dateInput instanceof Date) { // Already a Date object
+     if (dateInput instanceof Date) {
         date = dateInput;
-    } else { // Try to parse if it's a string or number
-      try {
-        date = new Date(dateInput);
-        if (isNaN(date.getTime())) return 'Invalid Date';
-      } catch (e) {
-        return 'Invalid Date';
+    } else if (typeof dateInput === 'number' || typeof dateInput === 'string') {
+      date = new Date(dateInput);
+    } else {
+       const anyDateInput = dateInput as any;
+      if (anyDateInput.toDate && typeof anyDateInput.toDate === 'function') {
+          date = anyDateInput.toDate();
+      } else {
+        return 'Invalid Date Input';
       }
     }
-    return format(date, 'PP');
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    return format(date, 'PP'); // Format as 'Month day, year'
   };
 
   if (isLoading) {
@@ -72,8 +73,9 @@ export function UserManagementTab() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold text-primary">Customer Profiles</h2>
-         <Button onClick={fetchCustomers} variant="outline" size="sm">
-            <RefreshCw className="mr-2 h-4 w-4" /> Refresh Customers
+         <Button onClick={fetchCustomers} variant="outline" size="sm" disabled={isLoading}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />} 
+            Refresh Customers
         </Button>
       </div>
 
@@ -84,7 +86,7 @@ export function UserManagementTab() {
             <TableHead>Email</TableHead>
             <TableHead>Total Orders</TableHead>
             <TableHead>Total Spent</TableHead>
-            <TableHead>Last Order</TableHead>
+            <TableHead>Last Order Date</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -100,8 +102,8 @@ export function UserManagementTab() {
               <TableRow key={customer.id}>
                 <TableCell className="font-medium">{customer.name}</TableCell>
                 <TableCell>{customer.email}</TableCell>
-                <TableCell>{customer.totalOrders}</TableCell>
-                <TableCell>${customer.totalSpent?.toFixed(2)}</TableCell>
+                <TableCell>{customer.totalOrders || 0}</TableCell>
+                <TableCell>${(customer.totalSpent || 0).toFixed(2)}</TableCell>
                 <TableCell>{formatDate(customer.lastOrderDate)}</TableCell>
               </TableRow>
             ))

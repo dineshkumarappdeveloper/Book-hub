@@ -1,4 +1,3 @@
-
 'use client';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,7 +26,8 @@ export function AdminDashboard() {
             </TabsTrigger>
             <TabsTrigger value="users" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
               <Users className="mr-2 h-4 w-4" /> Users
-            </TabsList>
+            </TabsTrigger>
+          </TabsList>
           <TabsContent value="books">
             <BookManagementTab />
           </TabsContent>

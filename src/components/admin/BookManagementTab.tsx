@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -27,13 +26,8 @@ export function BookManagementTab() {
     setError(null);
     try {
       const fetchedBooks = await getBooks();
-      // Ensure createdAt/updatedAt are Date objects for formatting
-      const processedBooks = fetchedBooks.map(book => ({
-        ...book,
-        createdAt: book.createdAt && typeof (book.createdAt as any).toDate === 'function' ? (book.createdAt as any).toDate() : book.createdAt,
-        updatedAt: book.updatedAt && typeof (book.updatedAt as any).toDate === 'function' ? (book.updatedAt as any).toDate() : book.updatedAt,
-      }));
-      setBooks(processedBooks);
+      // Server actions for RTDB should already convert timestamps to Date objects
+      setBooks(fetchedBooks);
     } catch (e) {
       setError((e as Error).message || 'Failed to fetch books.');
       toast({ title: 'Error', description: (e as Error).message, variant: 'destructive' });
@@ -72,23 +66,26 @@ export function BookManagementTab() {
     }
   };
   
-  const formatDate = (dateInput?: Date | {toDate: () => Date} | any): string => {
+  const formatDate = (dateInput?: Date | number | string): string => {
     if (!dateInput) return 'N/A';
     let date: Date;
-    if (dateInput.toDate && typeof dateInput.toDate === 'function') {
-        date = dateInput.toDate();
-    } else if (dateInput instanceof Date) {
+    if (dateInput instanceof Date) {
         date = dateInput;
+    } else if (typeof dateInput === 'number' || typeof dateInput === 'string') {
+      date = new Date(dateInput);
     } else {
-      try {
-        date = new Date(dateInput);
-        if (isNaN(date.getTime())) return 'Invalid Date';
-      } catch (e) {
-        return 'Invalid Date';
+      // Attempt to handle Firestore-like toDate if it was accidentally passed, though RTDB won't have this.
+      const anyDateInput = dateInput as any;
+      if (anyDateInput.toDate && typeof anyDateInput.toDate === 'function') {
+          date = anyDateInput.toDate();
+      } else {
+          return 'Invalid Date Input';
       }
     }
+
+    if (isNaN(date.getTime())) return 'Invalid Date';
     return format(date, 'PPpp');
-};
+  };
 
 
   if (isLoading) {
@@ -141,7 +138,7 @@ export function BookManagementTab() {
               <TableRow key={book.id}>
                 <TableCell className="font-medium">{book.title}</TableCell>
                 <TableCell>{book.author}</TableCell>
-                <TableCell>${book.price.toFixed(2)}</TableCell>
+                <TableCell>${book.price ? book.price.toFixed(2) : '0.00'}</TableCell>
                 <TableCell>{formatDate(book.createdAt)}</TableCell>
                 <TableCell className="space-x-2">
                   <Button variant="outline" size="sm" onClick={() => openEditDialog(book)}>

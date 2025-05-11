@@ -1,29 +1,37 @@
-
 'use server';
 
-import { firestore } from '@/lib/firebase/admin';
+import { database } from '@/lib/firebase/admin';
 import type { Order, CustomerProfile } from '@/lib/types';
-import type { Timestamp as AdminTimestamp } from 'firebase-admin/firestore';
 
-const ORDERS_COLLECTION = 'orders';
+const ORDERS_REF = 'orders';
 
 export async function getCustomerProfiles(): Promise<CustomerProfile[]> {
   try {
-    const ordersSnapshot = await firestore.collection(ORDERS_COLLECTION).orderBy('orderDate', 'desc').get();
-    if (ordersSnapshot.empty) {
+    // Fetch all orders to derive customer profiles
+    // Note: For very large datasets, this might be inefficient.
+    // Consider denormalizing customer data or using Firebase Functions for aggregation.
+    const ordersSnapshot = await database.ref(ORDERS_REF).orderByChild('orderDate').once('value');
+    if (!ordersSnapshot.exists()) {
       return [];
     }
 
     const customerMap = new Map<string, CustomerProfile>();
+    
+    ordersSnapshot.forEach(docSnapshot => {
+      const orderId = docSnapshot.key!;
+      const order = docSnapshot.val() as Omit<Order, 'id'>; // RTDB data
 
-    ordersSnapshot.docs.forEach(doc => {
-      const order = doc.data() as Omit<Order, 'id'>; // ID is not needed here
+      if (!order.deliveryInfo || !order.deliveryInfo.email) return; // Skip if essential info is missing
+
       const email = order.deliveryInfo.email.toLowerCase();
-      const orderDate = (order.orderDate as AdminTimestamp)?.toDate ? (order.orderDate as AdminTimestamp).toDate() : new Date();
+      // Order date from RTDB will be a number (timestamp)
+      const orderDateMs = order.orderDate as number; 
+      const orderDate = new Date(orderDateMs);
+
 
       if (!customerMap.has(email)) {
         customerMap.set(email, {
-          id: email,
+          id: email, // Using email as ID for simplicity
           name: order.deliveryInfo.name,
           email: order.deliveryInfo.email,
           firstOrderDate: orderDate,
@@ -36,20 +44,20 @@ export async function getCustomerProfiles(): Promise<CustomerProfile[]> {
       const customer = customerMap.get(email)!;
       customer.totalOrders! += 1;
       customer.totalSpent! += order.totalAmount;
+
       if (orderDate < (customer.firstOrderDate as Date)) {
         customer.firstOrderDate = orderDate;
       }
       if (orderDate > (customer.lastOrderDate as Date)) {
         customer.lastOrderDate = orderDate;
-        // Update name if a more recent order has a different one (though less likely for same email)
-        customer.name = order.deliveryInfo.name; 
+        customer.name = order.deliveryInfo.name; // Update name if different in a more recent order
       }
     });
     
     return Array.from(customerMap.values()).sort((a,b) => (b.lastOrderDate as Date).getTime() - (a.lastOrderDate as Date).getTime());
 
   } catch (error) {
-    console.error("Error fetching customer profiles:", error);
+    console.error("Error fetching customer profiles from RTDB orders:", error);
     throw new Error("Failed to fetch customer profiles.");
   }
 }

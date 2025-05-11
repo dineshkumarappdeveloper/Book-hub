@@ -1,60 +1,64 @@
-
 'use server';
 
-import { firestore } from '@/lib/firebase/admin';
+import { database } from '@/lib/firebase/admin';
 import type { Order } from '@/lib/types';
-import { FieldValue } from 'firebase-admin/firestore';
+import admin from 'firebase-admin';
 
-const ORDERS_COLLECTION = 'orders';
+const ORDERS_REF = 'orders';
 
 export async function getOrders(): Promise<Order[]> {
   try {
-    const snapshot = await firestore.collection(ORDERS_COLLECTION).orderBy('orderDate', 'desc').get();
-    if (snapshot.empty) {
+    const snapshot = await database.ref(ORDERS_REF).orderByChild('orderDate').once('value');
+    if (!snapshot.exists()) {
       return [];
     }
-    return snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        // Ensure Timestamps are converted if client needs serializable dates
-        // orderDate: data.orderDate.toDate(), 
-        ...data,
-      } as Order;
+    const ordersData = snapshot.val();
+    const ordersArray: Order[] = [];
+    snapshot.forEach(childSnapshot => {
+        const order = childSnapshot.val();
+        ordersArray.push({
+            ...order,
+            id: childSnapshot.key,
+            orderDate: new Date(order.orderDate),
+            updatedAt: order.updatedAt ? new Date(order.updatedAt) : undefined,
+        } as Order);
     });
+    return ordersArray.reverse(); // For descending order
   } catch (error) {
-    console.error("Error fetching orders:", error);
+    console.error("Error fetching orders from RTDB:", error);
     throw new Error("Failed to fetch orders.");
   }
 }
 
 export async function updateOrderStatus(orderId: string, status: Order['status']): Promise<void> {
   try {
-    const orderRef = firestore.collection(ORDERS_COLLECTION).doc(orderId);
+    const orderRef = database.ref(`${ORDERS_REF}/${orderId}`);
     await orderRef.update({
       status: status,
-      updatedAt: FieldValue.serverTimestamp(), // Optional: track status updates
+      updatedAt: admin.database.ServerValue.TIMESTAMP,
     });
   } catch (error) {
-    console.error("Error updating order status:", error);
+    console.error("Error updating order status in RTDB:", error);
     throw new Error("Failed to update order status.");
   }
 }
 
 export async function getOrderById(orderId: string): Promise<Order | null> {
   try {
-    const doc = await firestore.collection(ORDERS_COLLECTION).doc(orderId).get();
-    if (!doc.exists) {
+    const snapshot = await database.ref(`${ORDERS_REF}/${orderId}`).once('value');
+    if (!snapshot.exists()) {
       return null;
     }
-    const data = doc.data();
+    const orderData = snapshot.val();
     return {
-      id: doc.id,
-      // orderDate: data.orderDate.toDate(),
-      ...data
+      id: snapshot.key,
+      ...orderData,
+      orderDate: new Date(orderData.orderDate),
+      updatedAt: orderData.updatedAt ? new Date(orderData.updatedAt) : undefined,
     } as Order;
-  } catch (error) {
-    console.error("Error fetching order by ID:", error);
+  } catch (error)
+ {
+    console.error("Error fetching order by ID from RTDB:", error);
     throw new Error("Failed to fetch order details.");
   }
 }

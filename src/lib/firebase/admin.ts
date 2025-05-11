@@ -8,8 +8,13 @@ if (!admin.apps.length) {
       throw new Error('FIREBASE_ADMIN_SDK_CONFIG environment variable is not set.');
     }
     const serviceAccount: ServiceAccount = JSON.parse(serviceAccountString);
+
+    // Ensure the databaseURL is provided if not automatically inferred or if connecting to a specific region
+    const databaseURL = process.env.FIREBASE_DATABASE_URL || `https://${serviceAccount.project_id}.firebaseio.com`;
+
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
+      databaseURL: databaseURL,
     });
     console.log('Firebase Admin SDK initialized successfully.');
   } catch (error) {
@@ -20,5 +25,6 @@ if (!admin.apps.length) {
   }
 }
 
-export const firestore = admin.firestore();
+export const firestore = admin.firestore(); // Keep for potential other uses or gradual migration
+export const database = admin.database();
 export default admin;

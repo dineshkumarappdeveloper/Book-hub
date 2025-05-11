@@ -1,91 +1,89 @@
-
 'use server';
 
-import { firestore } from '@/lib/firebase/admin';
+import { database } from '@/lib/firebase/admin';
 import type { Book } from '@/lib/types';
-import {FieldValue} from 'firebase-admin/firestore';
+import admin from 'firebase-admin'; // For ServerValue
 
-const BOOKS_COLLECTION = 'books';
+const BOOKS_REF = 'books';
 
 export async function getBooks(): Promise<Book[]> {
   try {
-    const snapshot = await firestore.collection(BOOKS_COLLECTION).orderBy('createdAt', 'desc').get();
-    if (snapshot.empty) {
+    const snapshot = await database.ref(BOOKS_REF).orderByChild('createdAt').once('value');
+    if (!snapshot.exists()) {
       return [];
     }
-    return snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        ...data,
-        id: doc.id,
-        // Convert Firestore Timestamps to serializable format (e.g., ISO string or Date object)
-        // For simplicity, assuming client can handle Firestore Timestamp objects if not serialized.
-        // If not, convert:
-        // createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
-        // updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
-      } as Book;
+    const booksData = snapshot.val();
+    const booksArray: Book[] = [];
+    // Firebase RTDB with orderByChild returns an object, iterate values or use snapshot.forEach
+    snapshot.forEach(childSnapshot => {
+        const book = childSnapshot.val();
+        booksArray.push({
+            ...book,
+            id: childSnapshot.key,
+            createdAt: book.createdAt ? new Date(book.createdAt) : undefined,
+            updatedAt: book.updatedAt ? new Date(book.updatedAt) : undefined,
+        } as Book);
     });
+    return booksArray.reverse(); // RTDB orderByChild is ascending, reverse for descending by date
   } catch (error) {
-    console.error("Error fetching books:", error);
+    console.error("Error fetching books from RTDB:", error);
     throw new Error("Failed to fetch books.");
   }
 }
 
 export async function addBook(bookData: Omit<Book, 'id' | 'createdAt' | 'updatedAt'>): Promise<Book> {
   try {
-    const newBookRef = firestore.collection(BOOKS_COLLECTION).doc();
-    const timestamp = FieldValue.serverTimestamp();
-    const newBook: Omit<Book, 'id'> & { createdAt: FieldValue, updatedAt: FieldValue } = {
+    const newBookRef = database.ref(BOOKS_REF).push();
+    const timestamp = admin.database.ServerValue.TIMESTAMP;
+    const newBookData = {
       ...bookData,
-      price: Number(bookData.price), // Ensure price is a number
+      price: Number(bookData.price),
       createdAt: timestamp,
       updatedAt: timestamp,
     };
-    await newBookRef.set(newBook);
-    return { ...bookData, id: newBookRef.id, createdAt: new Date(), updatedAt: new Date() }; // return with approximate date
+    await newBookRef.set(newBookData);
+    // For returning, simulate server-set timestamp for immediate use, or re-fetch
+    return { 
+        ...bookData, 
+        id: newBookRef.key!, 
+        createdAt: Date.now(), // Approximate client-side, real value is server-set
+        updatedAt: Date.now() 
+    } as Book;
   } catch (error) {
-    console.error("Error adding book:", error);
+    console.error("Error adding book to RTDB:", error);
     throw new Error("Failed to add book.");
   }
 }
 
 export async function updateBook(bookId: string, bookData: Partial<Omit<Book, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Book> {
   try {
-    const bookRef = firestore.collection(BOOKS_COLLECTION).doc(bookId);
+    const bookRef = database.ref(`${BOOKS_REF}/${bookId}`);
     const updates = {
       ...bookData,
-      ...(bookData.price && { price: Number(bookData.price) }), // Ensure price is a number if updated
-      updatedAt: FieldValue.serverTimestamp(),
+      ...(bookData.price && { price: Number(bookData.price) }),
+      updatedAt: admin.database.ServerValue.TIMESTAMP,
     };
     await bookRef.update(updates);
     
-    // For returning updated book, fetch it or merge updates
-    // This is a simplified return, actual timestamps would be set by server
-    const updatedDoc = await bookRef.get();
-    const data = updatedDoc.data();
-
+    const snapshot = await bookRef.once('value');
+    const updatedData = snapshot.val();
     return { 
-        id: bookId, 
-        title: data?.title,
-        author: data?.author,
-        description: data?.description,
-        coverImage: data?.coverImage,
-        price: data?.price,
-        // createdAt: data?.createdAt.toDate(), // Convert if needed
-        // updatedAt: new Date() // Approximate
-     } as Book;
-
+        ...updatedData, 
+        id: bookId,
+        createdAt: updatedData.createdAt ? new Date(updatedData.createdAt) : undefined,
+        updatedAt: updatedData.updatedAt ? new Date(updatedData.updatedAt) : Date.now(), // Approx if not set by server yet
+    } as Book;
   } catch (error) {
-    console.error("Error updating book:", error);
+    console.error("Error updating book in RTDB:", error);
     throw new Error("Failed to update book.");
   }
 }
 
 export async function deleteBook(bookId: string): Promise<void> {
   try {
-    await firestore.collection(BOOKS_COLLECTION).doc(bookId).delete();
+    await database.ref(`${BOOKS_REF}/${bookId}`).remove();
   } catch (error) {
-    console.error("Error deleting book:", error);
+    console.error("Error deleting book from RTDB:", error);
     throw new Error("Failed to delete book.");
   }
 }
