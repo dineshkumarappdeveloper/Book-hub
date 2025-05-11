@@ -18,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="">
+    <html lang="en"> {/* Removed className attribute */}
       <body className="antialiased min-h-screen flex flex-col">
         {children}
         <Toaster />
