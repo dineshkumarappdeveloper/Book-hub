@@ -18,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={``}> {/* Removed geistSans.variable and geistMono.variable */}
+    <html lang="en" className="">
       <body className="antialiased min-h-screen flex flex-col">
         {children}
         <Toaster />
